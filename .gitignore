@@ -1,0 +1,4 @@
+.lib/
+*.test
+coverage.out
+__pycache__/

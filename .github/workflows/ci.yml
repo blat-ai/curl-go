@@ -1,0 +1,52 @@
+name: Native integration tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15
+          - macos-15-intel
+          - windows-2025
+    runs-on: ${{ matrix.runner }}
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache: true
+      - name: Install checksum-verified native release
+        run: go run ./cmd/curl-go-install -with-cli
+      - name: Test every browser profile and request behavior
+        run: go test -count=1 ./...
+      - name: Check Go races
+        run: go test -race -count=1 ./...
+      - name: Vet
+        run: go vet ./...
+
+  musl:
+    name: Linux amd64 musl
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Alpine with the musl native release
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src golang:1.25-alpine sh -ec '
+            apk add --no-cache build-base ca-certificates git
+            go run ./cmd/curl-go-install -libc musl -with-cli
+            go test -count=1 ./...
+            go vet ./...
+          '
