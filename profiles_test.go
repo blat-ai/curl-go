@@ -216,6 +216,7 @@ func performProfileTLSExchange(t *testing.T, profile Profile, defaultHeaders boo
 			wire.Err = err
 		}
 		done <- wire
+		drainCaptureHTTP2(tlsConn)
 	}()
 	_, port, err := net.SplitHostPort(listener.Addr().String())
 	if err != nil {
@@ -626,4 +627,13 @@ func writeProfileHTTP2Frame(conn net.Conn, typeID, flags byte, streamID uint32, 
 	binary.BigEndian.PutUint32(header[5:], streamID)
 	_, err := conn.Write(append(header, payload...))
 	return err
+}
+
+// Clients can send SETTINGS acknowledgements after the request stream ends.
+// Closing a TCP socket with those bytes unread resets it on Windows and can
+// discard the response. Publish the capture first, then drain until the client
+// closes its handle; the deadline bounds cleanup of a peer that stays open.
+func drainCaptureHTTP2(conn net.Conn) {
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _ = io.Copy(io.Discard, conn)
 }

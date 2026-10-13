@@ -107,13 +107,36 @@ func TestReadmeCustomFingerprint(t *testing.T) {
 	}
 }
 
+func TestReadmeCustomFingerprintLineEndings(t *testing.T) {
+	data, err := os.ReadFile("README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := readmeCustomFingerprint(t)
+	lf := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, ending := range []struct{ name, text string }{
+		{"LF", lf}, {"CRLF", strings.ReplaceAll(lf, "\n", "\r\n")},
+	} {
+		t.Run(ending.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("README.md", []byte(ending.text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if got := readmeCustomFingerprint(t); got != want {
+				t.Fatalf("line endings changed documented fingerprint: got %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 func readmeCustomFingerprint(t *testing.T) Fingerprint {
 	t.Helper()
 	data, err := os.ReadFile("README.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, section, ok := strings.Cut(string(data), "## Custom fingerprints\n")
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	_, section, ok := strings.Cut(text, "## Custom fingerprints\n")
 	if !ok {
 		t.Fatal("README custom fingerprint section is missing")
 	}

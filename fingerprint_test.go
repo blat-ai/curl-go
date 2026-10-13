@@ -552,6 +552,7 @@ func performFingerprintTLSExchange(t *testing.T, profile Profile, fingerprint Fi
 			wire.Err = err
 		}
 		done <- wire
+		drainCaptureHTTP2(tlsConn)
 	}()
 	c, err := NewCurl()
 	if err != nil {

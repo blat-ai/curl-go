@@ -21,8 +21,8 @@ import (
 )
 
 type parityCapture struct {
-	TLS  *parityTLSCapture `json:"tls"`
-	HTTP parityHTTPCapture `json:"http"`
+	TLS  *parityTLSCapture  `json:"tls"`
+	HTTP parityHTTPCapture  `json:"http"`
 	QUIC *parityQUICCapture `json:"quic,omitempty"`
 }
 
@@ -205,7 +205,11 @@ func (s *parityTCPServer) handle(conn net.Conn) error {
 		conn = secure
 	}
 	if s.mode == "tls-http2" || s.mode == "tls12-http2" {
-		return serveParityHTTP2(conn, capture)
+		if err := serveParityHTTP2(conn, capture); err != nil {
+			return err
+		}
+		drainCaptureHTTP2(conn)
+		return nil
 	}
 	return serveParityHTTP1(conn, capture)
 }

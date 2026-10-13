@@ -27,12 +27,9 @@ func websocketBackpressureFixture(t *testing.T) (string, <-chan error, func(), <
 	var once sync.Once
 	releasePeer := func() { once.Do(func() { close(release) }) }
 	_, address := websocketFixture(t, false, func(connection net.Conn, reader *bufio.Reader, _ *http.Request) {
-		if tcp, ok := connection.(*net.TCPConn); ok {
-			if err := tcp.SetReadBuffer(16 << 10); err != nil {
-				started <- err
-				return
-			}
-		}
+		// Pausing reads backpressures the 16 MiB frame without shrinking TCP's
+		// receive window. A small SO_RCVBUF can keep Linux's queued data and FIN
+		// draining slowly even after increasing the buffer again.
 		var header [14]byte
 		_, err := io.ReadFull(reader, header[:])
 		if err == nil && (header[0] != 0x82 || header[1] != 0xff) {
@@ -43,9 +40,6 @@ func websocketBackpressureFixture(t *testing.T) (string, <-chan error, func(), <
 			return
 		}
 		<-release
-		if tcp, ok := connection.(*net.TCPConn); ok {
-			_ = tcp.SetReadBuffer(4 << 20)
-		}
 		_ = connection.SetReadDeadline(time.Now().Add(2 * time.Second))
 		received, err := io.Copy(io.Discard, reader)
 		drained <- websocketInterruptedWireResult{length: int64(binary.BigEndian.Uint64(header[2:10])), received: received, err: err}
